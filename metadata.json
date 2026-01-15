@@ -1,0 +1,5 @@
+{
+  "name": "K8s CRD Viewer",
+  "description": "A high-performance interactive viewer for Kubernetes Custom Resource Definitions (CRDs). Easily navigate complex schemas, visualize field hierarchies, and inspect types and descriptions.",
+  "requestFramePermissions": []
+}
