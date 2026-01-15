@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { parseCRDs } from './utils/yamlParser';
 import { CustomResourceDefinition } from './types';
 import { CRDViewer } from './components/CRDViewer';
-import { FileUp, Link as LinkIcon, AlertCircle, Loader2, Database, Search, Trash2 } from 'lucide-react';
+import { FileUp, Link as LinkIcon, AlertCircle, Loader2, Database, Search, Trash2, Clipboard, X } from 'lucide-react';
 
 const DEFAULT_BUNDLE_URL = "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/main/bundle.yaml";
 
@@ -13,6 +13,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState(DEFAULT_BUNDLE_URL);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Paste Modal State
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [pasteContent, setPasteContent] = useState('');
 
   const loadFromUrl = async (url: string) => {
     setLoading(true);
@@ -63,6 +67,32 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const handlePasteLoad = () => {
+    if (!pasteContent.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    setIsPasteModalOpen(false);
+    
+    // Small timeout to allow modal to close before heavy parsing
+    setTimeout(() => {
+      try {
+        const parsed = parseCRDs(pasteContent);
+        if (parsed.length === 0) {
+          setError("No CustomResourceDefinitions found in pasted content.");
+        } else {
+          setCrds(parsed);
+          setSelectedCrdIndex(0);
+        }
+      } catch (err) {
+        setError("Failed to parse pasted YAML. Please check the syntax.");
+      } finally {
+        setLoading(false);
+        setPasteContent('');
+      }
+    }, 100);
+  };
+
   const clearDefinitions = () => {
     setCrds([]);
     setSelectedCrdIndex(null);
@@ -81,7 +111,7 @@ export default function App() {
   );
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans">
+    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans relative">
       
       {/* Sidebar */}
       <div className="w-80 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-10 shadow-lg">
@@ -94,7 +124,7 @@ export default function App() {
         </div>
 
         {/* Controls */}
-        <div className="p-4 space-y-4 border-b border-slate-200">
+        <div className="p-4 space-y-3 border-b border-slate-200">
           <div>
             <label className="text-xs font-semibold text-slate-500 uppercase mb-2 block">Load Source</label>
             <div className="flex gap-2 mb-2">
@@ -114,22 +144,32 @@ export default function App() {
                 {loading ? <Loader2 className="animate-spin" size={14} /> : <LinkIcon size={14} />}
               </button>
             </div>
-            <div className="relative">
-               <input 
-                  type="file" 
-                  accept=".yaml,.yml,.json" 
-                  onChange={handleFileUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-               />
-               <button className="w-full text-xs flex items-center justify-center gap-2 border border-dashed border-slate-300 rounded py-2 text-slate-600 hover:bg-slate-50 hover:border-blue-400 transition-colors">
-                  <FileUp size={14} />
-                  Upload Bundle File
-               </button>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                 <input 
+                    type="file" 
+                    accept=".yaml,.yml,.json" 
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                 />
+                 <button className="w-full text-xs flex items-center justify-center gap-1.5 border border-dashed border-slate-300 rounded py-2 text-slate-600 hover:bg-slate-50 hover:border-blue-400 transition-colors">
+                    <FileUp size={14} />
+                    Upload File
+                 </button>
+              </div>
+              <button 
+                onClick={() => setIsPasteModalOpen(true)}
+                className="w-full text-xs flex items-center justify-center gap-1.5 border border-dashed border-slate-300 rounded py-2 text-slate-600 hover:bg-slate-50 hover:border-blue-400 transition-colors"
+              >
+                <Clipboard size={14} />
+                Paste Text
+              </button>
             </div>
           </div>
           
           {crds.length > 0 && (
-             <div className="space-y-2">
+             <div className="space-y-2 pt-1">
                 <div className="relative">
                     <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
                     <input 
@@ -155,7 +195,7 @@ export default function App() {
         <div className="flex-1 overflow-y-auto">
           {crds.length === 0 && !loading && !error && (
             <div className="p-8 text-center text-slate-400 text-sm">
-              Enter a URL or upload a file to view definitions.
+              Enter a URL, upload a file, or paste text to view definitions.
             </div>
           )}
           
@@ -213,6 +253,53 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Paste Modal */}
+      {isPasteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col h-[80vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-xl">
+              <div className="flex items-center gap-2">
+                <Clipboard className="text-blue-600" size={20} />
+                <h3 className="font-bold text-slate-800">Paste Manifest</h3>
+              </div>
+              <button 
+                onClick={() => setIsPasteModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1 rounded-lg transition-colors"
+              >
+                 <X size={20} />
+              </button>
+            </div>
+            <div className="p-0 flex-1 overflow-hidden relative">
+              <textarea
+                className="w-full h-full p-4 font-mono text-xs text-slate-700 bg-white resize-none focus:outline-none"
+                placeholder="Paste your YAML or JSON content here..."
+                value={pasteContent}
+                onChange={(e) => setPasteContent(e.target.value)}
+                autoFocus
+                spellCheck={false}
+              />
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl">
+              <button 
+                 onClick={() => setIsPasteModalOpen(false)}
+                 className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-800 border border-transparent hover:border-slate-200 rounded-lg transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                 onClick={handlePasteLoad}
+                 disabled={!pasteContent.trim()}
+                 className="px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Database size={14} />
+                Load Definitions
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
