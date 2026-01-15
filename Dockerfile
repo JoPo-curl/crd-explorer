@@ -15,10 +15,7 @@ RUN npm run build
 
 
 # ---- Runtime stage ----
-FROM nginx:alpine
-
-# Remove default nginx static files
-RUN rm -rf /usr/share/nginx/html/*
+FROM nginxinc/nginx-unprivileged:alpine
 
 # Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
